@@ -41,14 +41,55 @@ export default function DeeepThink() {
         .on(
           "postgres_changes",
           {
-            event: "*",
+            event: "INSERT",
             schema: "public",
             table: "thoughts",
             filter: `user_id=eq.${user.id}`,
           },
           (payload) => {
-            console.log("Real-time update:", payload)
-            loadThoughts() // データベースから最新データを再読み込み
+            const newThought = {
+              id: payload.new.id,
+              type: payload.new.category as "idea" | "task" | "note",
+              title: payload.new.title,
+              content: payload.new.content || "",
+              completed: payload.new.completed,
+            }
+            setThoughts((prev) => [newThought, ...prev])
+          },
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "thoughts",
+            filter: `user_id=eq.${user.id}`,
+          },
+          (payload) => {
+            setThoughts((prev) =>
+              prev.map((thought) =>
+                thought.id === payload.new.id
+                  ? {
+                      ...thought,
+                      title: payload.new.title,
+                      content: payload.new.content || "",
+                      completed: payload.new.completed,
+                    }
+                  : thought,
+              ),
+            )
+          },
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "DELETE",
+            schema: "public",
+            table: "thoughts",
+            filter: `user_id=eq.${user.id}`,
+          },
+          (payload) => {
+            setThoughts((prev) => prev.filter((thought) => thought.id !== payload.old.id))
           },
         )
         .subscribe()
@@ -108,6 +149,15 @@ export default function DeeepThink() {
           return
         }
 
+        const newThoughtItem: ThoughtItem = {
+          id: data.id,
+          type: newThought.type,
+          title: newThought.title,
+          content: newThought.content,
+          completed: newThought.type === "task" ? false : undefined,
+        }
+
+        setThoughts((prev) => [newThoughtItem, ...prev])
         setNewThought({ title: "", content: "", type: "idea" })
         setIsAdding(false)
       } catch (error) {
@@ -117,14 +167,18 @@ export default function DeeepThink() {
   }
 
   const deleteThought = async (id: string) => {
+    setThoughts((prev) => prev.filter((t) => t.id !== id))
+
     try {
       const { error } = await supabase.from("thoughts").delete().eq("id", id)
 
       if (error) {
+        loadThoughts()
         console.error("Error deleting thought:", error)
         return
       }
     } catch (error) {
+      loadThoughts()
       console.error("Error deleting thought:", error)
     }
   }
@@ -135,14 +189,18 @@ export default function DeeepThink() {
 
     const newCompleted = !thought.completed
 
+    setThoughts((prev) => prev.map((t) => (t.id === id ? { ...t, completed: newCompleted } : t)))
+
     try {
       const { error } = await supabase.from("thoughts").update({ completed: newCompleted }).eq("id", id)
 
       if (error) {
+        setThoughts((prev) => prev.map((t) => (t.id === id ? { ...t, completed: !newCompleted } : t)))
         console.error("Error updating thought:", error)
         return
       }
     } catch (error) {
+      setThoughts((prev) => prev.map((t) => (t.id === id ? { ...t, completed: !newCompleted } : t)))
       console.error("Error updating thought:", error)
     }
   }
@@ -182,7 +240,7 @@ export default function DeeepThink() {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-600 mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-600 mx-auto mb-6"></div>
           <p className="text-gray-600 text-lg">Loading...</p>
         </div>
       </div>
@@ -194,10 +252,10 @@ export default function DeeepThink() {
   }
 
   return (
-    <div className="min-h-screen bg-white p-4">
-      <div className="max-w-6xl mx-auto">
-        <div className="flex justify-end items-center mb-8 pt-4">
-          <div className="flex items-center gap-4">
+    <div className="min-h-screen bg-white">
+      <div className="max-w-6xl mx-auto px-6 py-8">
+        <div className="flex justify-end items-center mb-12">
+          <div className="flex items-center gap-6">
             <div className="flex items-center gap-2 text-lg text-gray-600">
               <User className="w-5 h-5" />
               {user.email}
@@ -206,24 +264,26 @@ export default function DeeepThink() {
               variant="outline"
               size="sm"
               onClick={handleSignOut}
-              className="flex items-center gap-2 text-gray-600 border-gray-600 bg-transparent"
+              className="flex items-center gap-2 text-lg text-gray-600 border-gray-600 bg-transparent hover:bg-gray-50"
             >
               <LogOut className="w-5 h-5" />
-              <span className="text-lg">Sign Out</span>
+              Sign Out
             </Button>
           </div>
         </div>
 
-        <header className="text-center mb-12">
-          <h1 className="text-5xl text-gray-600 mb-4">DeeepThink</h1>
-          <p className="text-lg text-gray-600 mb-2">Organize your thoughts into three simple categories.</p>
-          <p className="text-lg text-gray-600">Write them down. Clear them out when done.</p>
+        <header className="text-center mb-16">
+          <h1 className="text-5xl text-gray-600 mb-6">DeeepThink</h1>
+          <div className="space-y-2">
+            <p className="text-lg text-gray-600">Organize your thoughts into three simple categories.</p>
+            <p className="text-lg text-gray-600">Write them down. Clear them out when done.</p>
+          </div>
         </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
           <Card className="bg-white border border-gray-600">
-            <CardContent className="p-6 text-center">
-              <div className="flex items-center justify-center mb-2">
+            <CardContent className="p-8 text-center">
+              <div className="flex items-center justify-center mb-4">
                 <Lightbulb className="w-5 h-5 text-gray-600 mr-2" />
                 <span className="text-lg text-gray-600">{thoughts.filter((t) => t.type === "idea").length}</span>
               </div>
@@ -232,8 +292,8 @@ export default function DeeepThink() {
           </Card>
 
           <Card className="bg-white border border-gray-600">
-            <CardContent className="p-6 text-center">
-              <div className="flex items-center justify-center mb-2">
+            <CardContent className="p-8 text-center">
+              <div className="flex items-center justify-center mb-4">
                 <CheckSquare className="w-5 h-5 text-gray-600 mr-2" />
                 <span className="text-lg text-gray-600">
                   {thoughts.filter((t) => t.type === "task" && !t.completed).length}
@@ -244,8 +304,8 @@ export default function DeeepThink() {
           </Card>
 
           <Card className="bg-white border border-gray-600">
-            <CardContent className="p-6 text-center">
-              <div className="flex items-center justify-center mb-2">
+            <CardContent className="p-8 text-center">
+              <div className="flex items-center justify-center mb-4">
                 <FileText className="w-5 h-5 text-gray-600 mr-2" />
                 <span className="text-lg text-gray-600">{thoughts.filter((t) => t.type === "note").length}</span>
               </div>
@@ -255,10 +315,10 @@ export default function DeeepThink() {
         </div>
 
         {!isAdding && (
-          <div className="text-center mb-8">
+          <div className="text-center mb-12">
             <Button
               onClick={() => setIsAdding(true)}
-              className="bg-gray-600 hover:bg-gray-700 text-white px-8 py-3 text-lg"
+              className="bg-gray-600 hover:bg-gray-700 text-white px-8 py-4 text-lg"
             >
               <Plus className="w-5 h-5 mr-2" />
               Add New Thought
@@ -267,12 +327,12 @@ export default function DeeepThink() {
         )}
 
         {isAdding && (
-          <Card className="mb-8 bg-white border border-gray-600">
-            <CardHeader>
+          <Card className="mb-12 bg-white border border-gray-600">
+            <CardHeader className="pb-6">
               <CardTitle className="text-lg text-gray-600">Add New Thought</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex gap-2 mb-4">
+            <CardContent className="space-y-6">
+              <div className="flex gap-3">
                 {["idea", "task", "note"].map((type) => (
                   <Button
                     key={type}
@@ -281,8 +341,8 @@ export default function DeeepThink() {
                     onClick={() => setNewThought({ ...newThought, type: type as any })}
                     className={
                       newThought.type === type
-                        ? "bg-gray-600 hover:bg-gray-700 text-white"
-                        : "text-gray-600 border-gray-600"
+                        ? "bg-gray-600 hover:bg-gray-700 text-white px-4 py-2"
+                        : "text-gray-600 border-gray-600 px-4 py-2"
                     }
                   >
                     {getIcon(type)}
@@ -295,24 +355,24 @@ export default function DeeepThink() {
                 placeholder="Enter title..."
                 value={newThought.title}
                 onChange={(e) => setNewThought({ ...newThought, title: e.target.value })}
-                className="border-gray-600 text-lg text-gray-600"
+                className="border-gray-600 text-lg text-gray-600 py-3"
               />
 
               <Textarea
                 placeholder="Enter details..."
                 value={newThought.content}
                 onChange={(e) => setNewThought({ ...newThought, content: e.target.value })}
-                className="border-gray-600 min-h-[100px] text-lg text-gray-600"
+                className="border-gray-600 min-h-[120px] text-lg text-gray-600 p-4"
               />
 
-              <div className="flex gap-2">
-                <Button onClick={addThought} className="bg-gray-600 hover:bg-gray-700 text-lg">
+              <div className="flex gap-3">
+                <Button onClick={addThought} className="bg-gray-600 hover:bg-gray-700 text-lg px-6 py-3">
                   Add
                 </Button>
                 <Button
                   variant="outline"
                   onClick={() => setIsAdding(false)}
-                  className="text-gray-600 border-gray-600 text-lg"
+                  className="text-gray-600 border-gray-600 text-lg px-6 py-3"
                 >
                   Cancel
                 </Button>
@@ -327,11 +387,11 @@ export default function DeeepThink() {
               key={thought.id}
               className={`bg-white border border-gray-600 ${thought.completed ? "opacity-60" : ""}`}
             >
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
+              <CardHeader className="pb-4">
+                <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-2">
                     {getIcon(thought.type)}
-                    <Badge variant="secondary" className="text-lg text-gray-600">
+                    <Badge variant="secondary" className="text-lg text-gray-600 px-3 py-1">
                       {getTypeLabel(thought.type)}
                     </Badge>
                   </div>
@@ -339,23 +399,25 @@ export default function DeeepThink() {
                     variant="ghost"
                     size="sm"
                     onClick={() => deleteThought(thought.id)}
-                    className="text-gray-600 hover:text-gray-800 p-1"
+                    className="text-gray-600 hover:text-gray-800 p-2"
                   >
                     <Trash2 className="w-5 h-5" />
                   </Button>
                 </div>
-                <CardTitle className={`text-lg text-gray-600 ${thought.completed ? "line-through" : ""}`}>
+                <CardTitle
+                  className={`text-lg text-gray-600 leading-relaxed ${thought.completed ? "line-through" : ""}`}
+                >
                   {thought.title}
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <p className="text-gray-600 text-lg mb-4">{thought.content}</p>
+              <CardContent className="pt-0">
+                <p className="text-gray-600 text-lg leading-relaxed mb-6">{thought.content}</p>
                 {thought.type === "task" && (
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => toggleTask(thought.id)}
-                    className="w-full text-lg text-gray-600 border-gray-600"
+                    className="w-full text-lg text-gray-600 border-gray-600 py-3"
                   >
                     {thought.completed ? "Completed" : "Mark Complete"}
                   </Button>
@@ -366,9 +428,9 @@ export default function DeeepThink() {
         </div>
 
         {thoughts.length === 0 && !isAdding && (
-          <div className="text-center py-16">
-            <Lightbulb className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-            <h3 className="text-lg text-gray-600 mb-2">No thoughts yet</h3>
+          <div className="text-center py-20">
+            <Lightbulb className="w-16 h-16 text-gray-600 mx-auto mb-6" />
+            <h3 className="text-lg text-gray-600 mb-3">No thoughts yet</h3>
             <p className="text-lg text-gray-600">Add your first idea, task, or note to get started</p>
           </div>
         )}
