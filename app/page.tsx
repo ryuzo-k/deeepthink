@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Circle, Square, FileText, ArrowRight } from "lucide-react"
+import { Circle, Square, Brain, ArrowRight } from "lucide-react"
 import Link from "next/link"
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
@@ -79,12 +79,12 @@ export default function LandingPage() {
             <CardContent className="p-8">
               <div className="flex items-start space-x-4">
                 <div className="mt-1">
-                  <FileText className="w-5 h-5 text-gray-600" />
+                  <Brain className="w-5 h-5 text-gray-600" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-medium text-gray-600 mb-2">Notes</h3>
+                  <h3 className="text-lg font-medium text-gray-600 mb-2">Thoughts</h3>
                   <p className="text-lg text-gray-600 leading-relaxed">
-                    Save important information and learnings in a reviewable format.
+                    Record your core thinking, values, and philosophical foundations that guide your decisions.
                   </p>
                 </div>
               </div>

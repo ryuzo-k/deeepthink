@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Lightbulb, CheckSquare, FileText, Trash2, LogOut, User } from "lucide-react"
+import { Plus, Lightbulb, CheckSquare, Brain, Trash2, LogOut, User } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { supabase } from "@/lib/supabase/client"
 
@@ -217,7 +217,7 @@ export default function DeeepThink() {
       case "task":
         return <CheckSquare className="w-5 h-5" />
       case "note":
-        return <FileText className="w-5 h-5" />
+        return <Brain className="w-5 h-5" />
       default:
         return <Lightbulb className="w-5 h-5" />
     }
@@ -230,7 +230,7 @@ export default function DeeepThink() {
       case "task":
         return "Tasks"
       case "note":
-        return "Notes"
+        return "Thoughts"
       default:
         return "Ideas"
     }
@@ -306,10 +306,10 @@ export default function DeeepThink() {
           <Card className="bg-white border border-gray-600">
             <CardContent className="p-8 text-center">
               <div className="flex items-center justify-center mb-4">
-                <FileText className="w-5 h-5 text-gray-600 mr-2" />
+                <Brain className="w-5 h-5 text-gray-600 mr-2" />
                 <span className="text-lg text-gray-600">{thoughts.filter((t) => t.type === "note").length}</span>
               </div>
-              <p className="text-lg text-gray-600">Notes</p>
+              <p className="text-lg text-gray-600">Thoughts</p>
             </CardContent>
           </Card>
         </div>
@@ -431,7 +431,7 @@ export default function DeeepThink() {
           <div className="text-center py-20">
             <Lightbulb className="w-16 h-16 text-gray-600 mx-auto mb-6" />
             <h3 className="text-lg text-gray-600 mb-3">No thoughts yet</h3>
-            <p className="text-lg text-gray-600">Add your first idea, task, or note to get started</p>
+            <p className="text-lg text-gray-600">Add your first idea, task, or thought to get started</p>
           </div>
         )}
       </div>
