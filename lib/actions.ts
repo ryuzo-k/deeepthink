@@ -1,11 +1,28 @@
 "use server"
 
-import { createClient } from "@supabase/supabase-js"
-import { redirect } from "next/navigation"
+import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
+import { redirect } from "next/navigation"
 
 function createSupabaseServerClient() {
-  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+  const cookieStore = cookies()
+
+  return createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+    cookies: {
+      getAll() {
+        return cookieStore.getAll()
+      },
+      setAll(cookiesToSet) {
+        try {
+          cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options))
+        } catch {
+          // The `setAll` method was called from a Server Component.
+          // This can be ignored if you have middleware refreshing
+          // user sessions.
+        }
+      },
+    },
+  })
 }
 
 export async function signIn(prevState: any, formData: FormData) {
@@ -21,10 +38,9 @@ export async function signIn(prevState: any, formData: FormData) {
   }
 
   const supabase = createSupabaseServerClient()
-  let shouldRedirect = false
 
   try {
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const { error } = await supabase.auth.signInWithPassword({
       email: email.toString(),
       password: password.toString(),
     })
@@ -33,26 +49,11 @@ export async function signIn(prevState: any, formData: FormData) {
       return { error: error.message }
     }
 
-    if (data.user) {
-      const cookieStore = cookies()
-      cookieStore.set("supabase-auth-token", data.session?.access_token || "", {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        maxAge: 60 * 60 * 24 * 7, // 7 days
-      })
-      shouldRedirect = true
-    }
+    return { success: true }
   } catch (error) {
     console.error("Login error:", error)
     return { error: "An unexpected error occurred. Please try again." }
   }
-
-  if (shouldRedirect) {
-    redirect("/app")
-  }
-
-  return { error: "Authentication failed" }
 }
 
 export async function signUp(prevState: any, formData: FormData) {
@@ -93,14 +94,6 @@ export async function signUp(prevState: any, formData: FormData) {
 
 export async function signOut() {
   const supabase = createSupabaseServerClient()
-
-  try {
-    await supabase.auth.signOut()
-    const cookieStore = cookies()
-    cookieStore.delete("supabase-auth-token")
-  } catch (error) {
-    console.error("Sign out error:", error)
-  }
-
+  await supabase.auth.signOut()
   redirect("/")
 }
