@@ -2,9 +2,10 @@
 
 import { createClient } from "@supabase/supabase-js"
 import { redirect } from "next/navigation"
+import { cookies } from "next/headers"
 
 function createSupabaseServerClient() {
-  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 }
 
 export async function signIn(prevState: any, formData: FormData) {
@@ -20,9 +21,10 @@ export async function signIn(prevState: any, formData: FormData) {
   }
 
   const supabase = createSupabaseServerClient()
+  let shouldRedirect = false
 
   try {
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email: email.toString(),
       password: password.toString(),
     })
@@ -30,12 +32,27 @@ export async function signIn(prevState: any, formData: FormData) {
     if (error) {
       return { error: error.message }
     }
+
+    if (data.user) {
+      const cookieStore = cookies()
+      cookieStore.set("supabase-auth-token", data.session?.access_token || "", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 60 * 60 * 24 * 7, // 7 days
+      })
+      shouldRedirect = true
+    }
   } catch (error) {
     console.error("Login error:", error)
     return { error: "An unexpected error occurred. Please try again." }
   }
 
-  redirect("/app")
+  if (shouldRedirect) {
+    redirect("/app")
+  }
+
+  return { error: "Authentication failed" }
 }
 
 export async function signUp(prevState: any, formData: FormData) {
@@ -79,6 +96,8 @@ export async function signOut() {
 
   try {
     await supabase.auth.signOut()
+    const cookieStore = cookies()
+    cookieStore.delete("supabase-auth-token")
   } catch (error) {
     console.error("Sign out error:", error)
   }
