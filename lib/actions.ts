@@ -30,12 +30,12 @@ export async function signIn(prevState: any, formData: FormData) {
     if (error) {
       return { error: error.message }
     }
-
-    return { success: true }
   } catch (error) {
     console.error("Login error:", error)
     return { error: "An unexpected error occurred. Please try again." }
   }
+
+  redirect("/app")
 }
 
 export async function signUp(prevState: any, formData: FormData) {
@@ -76,6 +76,12 @@ export async function signUp(prevState: any, formData: FormData) {
 
 export async function signOut() {
   const supabase = createSupabaseServerClient()
-  await supabase.auth.signOut()
+
+  try {
+    await supabase.auth.signOut()
+  } catch (error) {
+    console.error("Sign out error:", error)
+  }
+
   redirect("/")
 }
